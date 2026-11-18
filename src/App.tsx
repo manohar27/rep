@@ -24,7 +24,8 @@ export default function App() {
           <SessionScreen key="session" onMinimize={() => setView('home')}
             onFinished={(s, tpl) => {
               celebrateBig()
-              setTimeout(() => setSummary(s), 450) // let the screen transition land first
+              // Let the screen transition land first; skip if a new workout was started meanwhile.
+              setTimeout(() => { if (!useStore.getState().active) setSummary(s) }, 450)
               if (tpl) toast('Template saved')
               setView('home')
             }} />

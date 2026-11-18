@@ -1,11 +1,10 @@
 import { motion } from 'framer-motion'
 import { useMemo } from 'react'
+import { fmtDay, setShort } from '../lib/format'
 import { bestsFrom, fmtW, isWarmup } from '../lib/records'
 import { getExercise, useStore } from '../lib/store'
 import { PRChip } from './PRChip'
 import { Sheet } from './Sheet'
-
-const day = (t: number) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 
 export function ExerciseHistory({ exerciseId, onClose }: { exerciseId: string | null; onClose: () => void }) {
   const history = useStore((s) => s.history)
@@ -49,11 +48,11 @@ export function ExerciseHistory({ exerciseId, onClose }: { exerciseId: string | 
             {past.length > 0 && <div className="h2" style={{ marginTop: 0 }}>History</div>}
             {past.map(({ s, se, prIds }, i) => (
               <motion.div key={s.id} className="past" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.03 }}>
-                <div className="past-date"><span>{day(s.finishedAt)}</span><span>{s.name}</span></div>
+                <div className="past-date"><span>{fmtDay(s.finishedAt)}</span><span>{s.name}</span></div>
                 <div className="past-sets">
                   {se.sets.map((x) => (
                     <span key={x.id} className={`past-set ${isWarmup(x) ? 'warm' : ''} ${prIds.has(x.id) ? 'pr' : ''}`}>
-                      {isWarmup(x) ? 'W ' : x.type === 'failure' ? 'F ' : ''}{timed ? `${x.weight || 0}m ${x.reps || 0}s` : x.weight ? `${x.weight}×${x.reps}` : `${x.reps} reps`}
+                      {setShort(x, ex)}
                     </span>
                   ))}
                   {(s.prs ?? []).some((p) => p.exerciseId === exerciseId && p.kind === 'volume') && <PRChip label="Volume" />}

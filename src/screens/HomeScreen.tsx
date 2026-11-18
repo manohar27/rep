@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
-import { Dots, Play, Plus, Trash, Trophy } from '../components/Icons'
+import { Dots, Lock, Play, Plus, Trash, Trophy } from '../components/Icons'
+import { lock } from '../lib/auth'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toast'
 import { getExercise, haptic, useStore, volumeOf, workingSets, type Template } from '../lib/store'
@@ -32,7 +33,13 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
     <motion.div className="screen" variants={container} initial="hidden" animate="show" exit={{ opacity: 0, scale: 0.98 }}>
       <motion.div variants={item}>
         <div className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
-        <h1 className="h1">rep<span style={{ color: 'var(--accent)' }}>.</span></h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 className="h1">rep<span style={{ color: 'var(--accent)' }}>.</span></h1>
+          <motion.button className="icon-btn" whileTap={{ scale: 0.88 }} aria-label="Lock"
+            onClick={async () => { haptic(8); if (!(await lock())) toast("Can't lock while offline") }}>
+            <Lock />
+          </motion.button>
+        </div>
       </motion.div>
 
       <motion.button variants={item} className="hero" whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} onClick={() => (active ? onStart() : begin(startEmpty))}>

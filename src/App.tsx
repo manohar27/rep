@@ -1,14 +1,18 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Celebrations, celebrateBig } from './components/Celebrate'
+import { LockScreen } from './components/LockScreen'
 import { PRSummary } from './components/PRSummary'
 import { Toaster, toast } from './components/Toast'
+import { checkAuth, useAuth } from './lib/auth'
 import { useStore, type CompletedSession } from './lib/store'
 import { HomeScreen } from './screens/HomeScreen'
 import { fmtDur, SessionScreen } from './screens/SessionScreen'
 
 export default function App() {
   const active = useStore((s) => s.active)
+  const phase = useAuth((s) => s.phase)
+  useEffect(() => { void checkAuth() }, [])
   const [view, setView] = useState<'home' | 'session'>(active ? 'session' : 'home')
   const [summary, setSummary] = useState<CompletedSession | null>(null)
   const [now, setNow] = useState(Date.now())
@@ -50,6 +54,10 @@ export default function App() {
 
       <PRSummary session={summary} onClose={() => setSummary(null)} />
       <Celebrations />
+      <AnimatePresence>
+        {(phase === 'setup' || phase === 'locked') && <LockScreen key="lock" mode={phase} />}
+      </AnimatePresence>
+      {phase === 'checking' && <div className="lock" aria-busy="true" />}
       <Toaster />
     </div>
   )

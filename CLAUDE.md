@@ -33,6 +33,13 @@ Every change must hold to these three. If a feature can't, rethink the feature.
 - `src/screens/` — Home and Session. `src/components/` — reusable pieces (Sheet, Toast, Ticker, ExercisePicker, ExerciseCard, RestTimer, Celebrate, PRChip, ExerciseHistory, PRSummary).
 - Styling is plain CSS in `src/styles.css` with tokens on `:root`. No CSS framework.
 
+## Server & auth
+
+- `api/` holds Vercel Functions (Web `Request` → `Response` handlers). `api/_lib/` is shared server code (not routed). Relative imports in `api/` use `.js` extensions (NodeNext ESM). `shared/` is code used by both client and server.
+- Database: Postgres (Neon via the Vercel Marketplace, env `DATABASE_URL`). `api/_lib/db.ts` exposes a tiny `Db.query` interface; schema is bootstrapped idempotently by `ensureSchema`. Tests swap in PGlite via `setDbForTests`.
+- Auth is a single-owner 6-digit passcode (`api/_lib/auth.ts`): scrypt-hashed, setup only while no owner exists, session = random token in an `HttpOnly; Secure; SameSite=Strict` cookie (only its SHA-256 stored), 5 failures / IP / 15 min and 30 / hour globally. New server features must check `isAuthenticated(req, db)`.
+- Offline-first wins: the client (`src/lib/auth.ts`) opens the app if the API is unreachable, has no database, or isn't JSON. The lock screen only appears when the server positively says "locked" or "setup". Never put secrets in client code.
+
 ## Conventions
 
 - Weight is stored as a string (keeps exactly what the user typed, e.g. `"62.5"`); parse with `parseFloat` only when computing.
@@ -41,5 +48,6 @@ Every change must hold to these three. If a feature can't, rethink the feature.
 - Per-exercise history and records are **derived** from `history` (`src/lib/records.ts`, cached per history array) — don't store a second copy. Each `CompletedSession` stores the `prs` it set at finish time (optional field; older sessions have none).
 - PR rules: judged only on checked, non-warm-up sets, in set order, against all prior sessions and earlier blocks of the same exercise in this session. One badge per set, priority Heaviest > nRM (≤ 12 reps; beats the heaviest weight ever done for at least n reps — needs such a prior set) > Best set (kg × reps) > Most reps (bodyweight). Plus one per-exercise session Volume PR. An exercise's first session with a working set is the baseline and awards nothing. Timed exercises have no PRs. Working volume has one definition: `setVolume` in records.ts.
 - PR celebrations fire only on the ✓ tap that completes the set (not on later edits): an icon-only gold trophy badge pops into the set row (never text there — it must not overflow), particles burst from it, and an achievement card rises from the row with the full sentence (`announce(el, prTitle(p), p.detail)`), plus haptic. Chips elsewhere use the short `prLabel` (Heavy, 5RM, Best set, Reps, Volume); full sentences use `prTitle`. Toasts queue, so simultaneous ones play in turn. Finishing with PRs shows the PR summary sheet. Gold (`--gold`) is for PRs only.
-- `npm run build` (type-check + build) must pass before committing.
+- `npm run build` (type-checks client and `api/`, then builds) must pass before committing.
 - Branches: `feat/*` for work, merged into `main`. Vercel deploys every push; `main` is production.
+- Tasks are tracked in GitHub issues; reference them in commits (`#1`).

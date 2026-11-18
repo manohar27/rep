@@ -89,10 +89,10 @@ export function exercisePRs(se: SessionExercise, history: CompletedSession[], bl
     // nRM needs a prior set of at least n reps to beat; a first-ever 8-rep back-off set isn't a record.
     const rmBar = bestAtLeast(run, r)
     let hit: [PRKind, string] | null = null
-    if (w > 0 && w > run.maxWeight) hit = ['heaviest', 'Heaviest']
+    if (w > 0 && w > run.maxWeight) hit = ['heaviest', 'Heavy']
     else if (w > 0 && r <= 12 && rmBar > 0 && w > rmBar) hit = ['rm', `${r}RM`]
     else if (w > 0 && w * r > run.bestSet) hit = ['bestSet', 'Best set']
-    else if (w === 0 && r > run.maxReps) hit = ['reps', 'Most reps']
+    else if (w === 0 && r > run.maxReps) hit = ['reps', 'Reps']
     if (hit) hits.push({ exerciseId: se.exerciseId, setId: s.id, kind: hit[0], label: hit[1], detail: w > 0 ? `${fmtW(w)} kg × ${r}` : `${r} reps` })
     absorb(run, w, r)
   }
@@ -102,6 +102,13 @@ export function exercisePRs(se: SessionExercise, history: CompletedSession[], bl
     hits.push({ exerciseId: se.exerciseId, kind: 'volume', label: 'Volume', detail: `${Math.round(vol).toLocaleString()} kg` })
   return hits
 }
+
+// Short label for chips (fits a badge) and the full sentence for celebrations and summaries.
+// Derived from `kind` so sessions saved with older label wording still render consistently.
+export const prLabel = (p: PRHit) =>
+  ({ heaviest: 'Heavy', rm: p.label, bestSet: 'Best set', reps: 'Reps', volume: 'Volume' })[p.kind]
+export const prTitle = (p: PRHit) =>
+  ({ heaviest: 'Heaviest weight ever', rm: `New ${p.label.replace('RM', '')}-rep max`, bestSet: 'Best set ever', reps: 'Most reps ever', volume: 'Highest session volume' })[p.kind]
 
 export const sessionPRs = (exercises: SessionExercise[], history: CompletedSession[]) =>
   exercises.flatMap((se) => exercisePRs(se, history, exercises))

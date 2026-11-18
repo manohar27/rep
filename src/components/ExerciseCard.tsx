@@ -1,11 +1,10 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getExercise, haptic, isWarmup, sanitizeReps, sanitizeWeight, usePrevious, useStore, type SessionExercise, type SetEntry, type SetType } from '../lib/store'
-import { exercisePRs, type PRHit } from '../lib/records'
-import { celebrateFrom } from './Celebrate'
+import { exercisePRs, prTitle, type PRHit } from '../lib/records'
+import { announce } from './Celebrate'
 import { Check, Dots, Down, Trash, Up } from './Icons'
 import { PRChip } from './PRChip'
-import { toast } from './Toast'
 
 export function ExerciseCard({ se, index, total, onSetDone, onHistory }: { se: SessionExercise; index: number; total: number; onSetDone: () => void; onHistory: (exerciseId: string) => void }) {
   const custom = useStore((s) => s.custom)
@@ -27,7 +26,7 @@ export function ExerciseCard({ se, index, total, onSetDone, onHistory }: { se: S
   const hadVolumePR = useRef(!!volumePR)
   const lastDone = useRef(doneCount)
   useEffect(() => {
-    if (volumePR && !hadVolumePR.current && doneCount > lastDone.current) { celebrateFrom(volRef.current, { n: 16 }); toast(`Volume PR · ${ex.name}`) }
+    if (volumePR && !hadVolumePR.current && doneCount > lastDone.current) announce(volRef.current, `${prTitle(volumePR)} · ${ex.name}`, volumePR.detail)
     hadVolumePR.current = !!volumePR
     lastDone.current = doneCount
   }, [volumePR, doneCount, ex.name])
@@ -100,9 +99,8 @@ function SetRow({ seId, s, label, pr, prev, isTime, onDone, canDelete }: { seId:
   const wasDone = useRef(s.done)
   useEffect(() => {
     if (s.done && !wasDone.current && pr) {
-      celebrateFrom(chipRef.current)
+      announce(chipRef.current, prTitle(pr), pr.detail)
       haptic([15, 40, 15, 40, 50])
-      toast(`New PR · ${pr.label} · ${pr.detail}`)
     }
     wasDone.current = s.done
   }, [s.done, pr])
@@ -140,7 +138,7 @@ function SetRow({ seId, s, label, pr, prev, isTime, onDone, canDelete }: { seId:
           </AnimatePresence></span>
         </motion.button>
         <span className="set-prev">
-          {s.done && pr ? <PRChip ref={chipRef} key={pr.label} label={pr.label} /> : prev ? (prev.weight ? `${prev.weight}×${prev.reps}` : prev.reps) : '—'}
+          {s.done && pr ? <PRChip ref={chipRef} key={pr.label} title={`${prTitle(pr)} · ${pr.detail}`} /> : prev ? (prev.weight ? `${prev.weight}×${prev.reps}` : prev.reps) : '—'}
         </span>
         <input className="set-in" inputMode="decimal" type="text" autoComplete="off" placeholder={prev?.weight || '0'} value={s.weight}
           onChange={(e) => updateSet(seId, s.id, { weight: sanitizeWeight(e.target.value) })} onFocus={(e) => e.target.select()} aria-label="Weight" />

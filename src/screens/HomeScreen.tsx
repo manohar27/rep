@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
 import { Dots, Play, Plus, Trash, Trophy } from '../components/Icons'
+import { SessionSummary } from '../components/SessionSummary'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toast'
-import { getExercise, haptic, useStore, volumeOf, workingSets, type Template } from '../lib/store'
+import { getExercise, haptic, useStore, volumeOf, workingSets, type CompletedSession, type Template } from '../lib/store'
 import { fmtDur } from './SessionScreen'
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.05 } } }
@@ -22,6 +23,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
   const { startEmpty, startFromTemplate, deleteTemplate } = useStore.getState()
   const [preview, setPreview] = useState<Template | null>(null)
   const [menu, setMenu] = useState<string | null>(null)
+  const [openSession, setOpenSession] = useState<CompletedSession | null>(null)
 
   const begin = (fn: () => void) => {
     if (active) { onStart(); return }
@@ -80,15 +82,17 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
         <motion.div variants={item} className="empty">Your finished sessions show up here.</motion.div>
       ) : (
         history.slice(0, 20).map((h) => (
-          <motion.div variants={item} key={h.id} className="card hist">
+          <motion.button variants={item} key={h.id} className="card hist" whileTap={{ scale: 0.98 }} onClick={() => { haptic(4); setOpenSession(h) }}>
             <div style={{ minWidth: 0 }}>
               <div className="hist-name">{h.name}</div>
               <div className="hist-sub">{h.prs?.length ? <><span className="hist-pr"><Trophy width={12} height={12} />{h.prs.length}</span> · </> : null}{ago(h.finishedAt)} · {fmtDur(h.finishedAt - h.startedAt)} · {h.exercises.length} exercise{h.exercises.length === 1 ? "" : "s"}</div>
             </div>
             <div className="hist-stat"><b>{Math.round(volumeOf(h, false)).toLocaleString()}</b> kg<br /><b>{workingSets(h, false)}</b> sets</div>
-          </motion.div>
+          </motion.button>
         ))
       )}
+
+      <SessionSummary session={openSession} onClose={() => setOpenSession(null)} />
 
       <Sheet open={!!preview} onClose={() => setPreview(null)}>
         {preview && (

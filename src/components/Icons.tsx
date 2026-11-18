@@ -13,3 +13,4 @@ export const Play = (p: SVGProps<SVGSVGElement>) => <svg {...base(p)} fill="curr
 export const Dumbbell = (p: SVGProps<SVGSVGElement>) => <svg {...base(p)}><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12" /></svg>
 export const Timer = (p: SVGProps<SVGSVGElement>) => <svg {...base(p)} width={18} height={18}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9 2h6" /></svg>
 export const Trophy = (p: SVGProps<SVGSVGElement>) => <svg {...base({ width: 14, height: 14, ...p })}><path d="M8 4h8v5a4 4 0 01-8 0V4zM8 6H5a3 3 0 003 4M16 6h3a3 3 0 01-3 4M12 13v4M8.5 20h7M10 17h4" /></svg>
+export const Copy = (p: SVGProps<SVGSVGElement>) => <svg {...base({ width: 18, height: 18, ...p })}><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M5 15V6a2 2 0 012-2h9" /></svg>

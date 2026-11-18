@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Celebrations, celebrateBig } from './components/Celebrate'
-import { PRSummary } from './components/PRSummary'
+import { SessionSummary } from './components/SessionSummary'
 import { Toaster, toast } from './components/Toast'
 import { useStore, type CompletedSession } from './lib/store'
 import { HomeScreen } from './screens/HomeScreen'
@@ -24,8 +24,8 @@ export default function App() {
           <SessionScreen key="session" onMinimize={() => setView('home')}
             onFinished={(s, tpl) => {
               celebrateBig()
-              if (s.prs?.length) setTimeout(() => setSummary(s), 450) // let the screen transition land first
-              toast(tpl ? 'Workout & template saved' : 'Workout saved')
+              setTimeout(() => setSummary(s), 450) // let the screen transition land first
+              if (tpl) toast('Template saved')
               setView('home')
             }} />
         ) : (
@@ -48,7 +48,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <PRSummary session={summary} onClose={() => setSummary(null)} />
+      <SessionSummary session={summary} fresh onClose={() => setSummary(null)} />
       <Celebrations />
       <Toaster />
     </div>

@@ -80,7 +80,7 @@ input { font: inherit; color: inherit; }
 
 .empty { padding: 22px; text-align: center; color: var(--muted); border: 1.5px dashed var(--line); border-radius: var(--radius); font-size: 14px; }
 
-.hist { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.hist { width: 100%; text-align: left; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .hist + .hist { margin-top: 8px; }
 .hist-name { font-weight: 600; }
 .hist-sub { font-size: 13px; color: var(--muted); }

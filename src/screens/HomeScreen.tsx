@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
 import { Dots, Lock, Play, Plus, Trash, Trophy } from '../components/Icons'
+import { Wordmark } from '../components/Wordmark'
 import { lock, useAuth } from '../lib/auth'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toast'
@@ -35,7 +36,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
       <motion.div variants={item}>
         <div className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h1 className="h1">rep<span style={{ color: 'var(--accent)' }}>.</span></h1>
+          <h1 style={{ margin: 0 }}><Wordmark /></h1>
           {authAvailable && (
             <motion.button className="icon-btn" whileTap={{ scale: 0.88 }} aria-label="Lock"
               onClick={async () => {

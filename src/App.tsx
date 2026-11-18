@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Celebrations, celebrateBig } from './components/Celebrate'
 import { LockScreen } from './components/LockScreen'
+import { Wordmark } from './components/Wordmark'
 import { PRSummary } from './components/PRSummary'
 import { Toaster, toast } from './components/Toast'
 import { checkAuth, useAuth } from './lib/auth'
@@ -59,9 +60,7 @@ export default function App() {
       </AnimatePresence>
       {phase === 'checking' && (
         <div className="lock" aria-busy="true" style={{ justifyContent: 'center' }}>
-          <motion.div className="h1" style={{ fontSize: 28 }} animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.4, repeat: Infinity }}>
-            rep<span style={{ color: 'var(--accent)' }}>.</span>
-          </motion.div>
+          <Wordmark size={28} />
         </div>
       )}
       <Toaster />

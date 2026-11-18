@@ -14,3 +14,4 @@ export const Dumbbell = (p: SVGProps<SVGSVGElement>) => <svg {...base(p)}><path 
 export const Timer = (p: SVGProps<SVGSVGElement>) => <svg {...base(p)} width={18} height={18}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9 2h6" /></svg>
 export const Trophy = (p: SVGProps<SVGSVGElement>) => <svg {...base({ width: 14, height: 14, ...p })}><path d="M8 4h8v5a4 4 0 01-8 0V4zM8 6H5a3 3 0 003 4M16 6h3a3 3 0 01-3 4M12 13v4M8.5 20h7M10 17h4" /></svg>
 export const Lock = (p: SVGProps<SVGSVGElement>) => <svg {...base({ width: 20, height: 20, ...p })}><rect x="5" y="11" width="14" height="10" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>
+export const Backspace = (p: SVGProps<SVGSVGElement>) => <svg {...base({ width: 26, height: 26, strokeWidth: 2, ...p })}><path d="M21 5H9l-6 7 6 7h12a1 1 0 001-1V6a1 1 0 00-1-1zM17 9l-5 6M12 9l5 6" /></svg>

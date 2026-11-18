@@ -48,7 +48,7 @@ export async function checkAuth(notice: string | null = null) {
   }
 }
 
-export type AuthError = 'wrong' | 'bad_key' | 'weak' | 'locked' | 'invalid' | 'taken' | 'reset' | 'network'
+export type AuthError = 'wrong' | 'bad_key' | 'weak' | 'locked' | 'invalid' | 'taken' | 'reset' | 'server' | 'network'
 export type AuthResult = { ok: true } | { ok: false; error: AuthError; remaining?: number; retryAfter?: number; global?: boolean }
 
 async function submit(path: 'setup' | 'login', body: Record<string, string>): Promise<AuthResult> {
@@ -60,7 +60,7 @@ async function submit(path: 'setup' | 'login', body: Record<string, string>): Pr
     if (status === 409) { void checkAuth('A passcode is already set — enter it'); return { ok: false, error: 'taken' } }
     if (data.error === 'wrong' || data.error === 'bad_key') return { ok: false, error: data.error, remaining: Number(data.remaining) }
     if (data.error === 'weak') return { ok: false, error: 'weak' }
-    return { ok: false, error: status === 400 ? 'invalid' : 'network' }
+    return { ok: false, error: status === 400 ? 'invalid' : 'server' } // 5xx, or no database
   } catch {
     return { ok: false, error: 'network' }
   }

@@ -325,6 +325,8 @@ input[type=number] { -moz-appearance: textfield; }
 .lock-key.del { background: transparent; color: var(--muted); }
 .lock-key:disabled { opacity: .35; }
 @media (max-height: 640px) { .lock { padding-top: calc(var(--safe-top) + 20px); } .lock-key { width: 64px; height: 64px; font-size: 24px; } .lock-pad { grid-template-columns: repeat(3, 64px); gap: 12px 24px; } }
-.lock-keyform { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; margin-bottom: auto; margin-top: 32px; }
+/* sits at the bottom (the .lock column is space-between) so Continue is thumb-reachable */
+.lock-keyform { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+.wordmark { display: inline-block; margin: 0; }
 .lock-keyinput { height: 54px; border-radius: 14px; background: var(--card); border: 1.5px solid var(--line); outline: 0; padding: 0 16px; font-size: 17px; text-align: center; letter-spacing: .08em; }
 .lock-keyinput:focus { border-color: var(--accent); }

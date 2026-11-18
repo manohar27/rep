@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { isWeak } from '../../shared/passcode'
 import { checkSetupKey, createPasscode, openApp, unlock, useAuth, type AuthResult } from '../lib/auth'
 import { haptic } from '../lib/store'
+import { Backspace } from './Icons'
+import { Wordmark } from './Wordmark'
 
 type Step = 'key' | 'create' | 'confirm' | 'enter'
 const LEN = 6
@@ -56,6 +58,8 @@ export function LockScreen({ mode }: { mode: 'setup' | 'locked' }) {
     }
     if (r.error === 'weak') { setStep('create'); setFirst(''); return reject('Too easy to guess — try another') }
     if (r.error === 'reset' || r.error === 'taken') return // checkAuth switches mode and supplies the notice
+    if (r.error === 'invalid') return reject('Enter all 6 digits')
+    if (r.error === 'server') return reject('Server problem — try again shortly')
     reject("Can't reach the server — check your connection")
   }, [reject])
 
@@ -123,7 +127,7 @@ export function LockScreen({ mode }: { mode: 'setup' | 'locked' }) {
     <motion.div className="lock" role="dialog" aria-modal="true" aria-label={title}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 1.04, transition: SPRING }}>
       <div className="lock-top">
-        <div className="h1" style={{ fontSize: 28 }}>rep<span style={{ color: 'var(--accent)' }}>.</span></div>
+        <Wordmark size={28} />
         <motion.div key={step} className="lock-title" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={SPRING}>{title}</motion.div>
         <div className={`lock-sub ${msg || locked ? 'err' : ''}`} aria-live="polite">{sub}</div>
         {step !== 'key' && (
@@ -156,9 +160,7 @@ export function LockScreen({ mode }: { mode: 'setup' | 'locked' }) {
             {KEYS.map((k, i) => k === '' ? <span key={i} /> : (
               <motion.button key={i} className={`lock-key ${k === 'del' ? 'del' : ''}`} whileTap={{ scale: 0.88 }}
                 onClick={() => press(k)} disabled={locked || busy} aria-label={k === 'del' ? 'Delete' : k}>
-                {k === 'del' ? (
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 5H9l-6 7 6 7h12a1 1 0 001-1V6a1 1 0 00-1-1zM17 9l-5 6M12 9l5 6" /></svg>
-                ) : k}
+                {k === 'del' ? <Backspace /> : k}
               </motion.button>
             ))}
           </motion.div>

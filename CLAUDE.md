@@ -36,10 +36,13 @@ Every change must hold to these three. If a feature can't, rethink the feature.
 ## Server & auth
 
 - `api/` holds Vercel Functions (Web `Request` → `Response` handlers). `api/_lib/` is shared server code (not routed). Relative imports in `api/` use `.js` extensions (NodeNext ESM). `shared/` is code used by both client and server.
-- Database: Postgres (Neon via the Vercel Marketplace, env `DATABASE_URL`). `api/_lib/db.ts` exposes a tiny `Db.query` interface; schema is bootstrapped idempotently by `ensureSchema`. Tests swap in PGlite via `setDbForTests`.
+- Database: Postgres (Neon via the Vercel Marketplace, env `DATABASE_URL`). `api/_lib/db.ts` exposes a tiny `Db.query` interface; schema is bootstrapped by `ensureSchema`, versioned by `SCHEMA_VERSION`. Tests swap in PGlite via `setDbForTests`.
 - Auth is a single-owner 6-digit passcode (`api/_lib/auth.ts`): scrypt-hashed; session = random token in an `HttpOnly; Secure; SameSite=Strict` cookie (only its SHA-256 stored, 90 days). New server features must check `isAuthenticated(req, db)`.
 - Setup needs env `REP_SETUP_KEY` (chosen by the owner in Vercel; never in code or chat). Unset = setup disabled and the app simply opens. Setup closes once an owner exists; reset = delete the `owner` row.
-- Rate limits: every attempt (passcode or setup key) is inserted as a failure *before* checking, then counted — this keeps concurrent bursts within limits. 5 failures / IP / 15 min (reset by a success); 30 / hour globally, except IPs with a successful sign-in in the last 90 days (so the cap can't lock the owner out).
+- Rate limits: every attempt (passcode or setup key) is inserted as a failure *before* checking, then counted — this keeps concurrent bursts within limits; a refused attempt deletes its row (spam can't extend a lockout or inflate the global count). 5 failures / IP / 15 min (reset by a success); 30 / hour globally from untrusted devices.
+- Trusted device: a successful sign-in also sets a long-lived `rep_device` cookie (kept across lock/unlock). Requests carrying it skip the global cap on any network, so the cap can't lock the owner out.
+- Sessions and devices only count if created after the current `owner` row, so a reset invalidates all of them.
+- Schema changes: edit `ensureSchema` (idempotent DDL) and bump `SCHEMA_VERSION`.
 - Tests: `npm test` runs `tests/*.test.ts` against PGlite.
 - Offline-first wins: the client (`src/lib/auth.ts`) opens the app if the API is unreachable, has no database, or isn't JSON. The lock screen only appears when the server positively says "locked" or "setup". Never put secrets in client code.
 

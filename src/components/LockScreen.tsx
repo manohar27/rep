@@ -1,30 +1,40 @@
-import { motion, useAnimationControls } from 'framer-motion'
+import { AnimatePresence, motion, useAnimationControls } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isWeak } from '../../shared/passcode'
-import { createPasscode, openApp, unlock, type AuthResult } from '../lib/auth'
+import { checkSetupKey, createPasscode, openApp, unlock, useAuth, type AuthResult } from '../lib/auth'
 import { haptic } from '../lib/store'
 
-type Step = 'enter' | 'create' | 'confirm'
+type Step = 'key' | 'create' | 'confirm' | 'enter'
 const LEN = 6
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const
+const SPRING = { type: 'spring', stiffness: 500, damping: 32 } as const
 
 const mins = (s: number) => Math.max(1, Math.ceil(s / 60))
+const tries = (n?: number) => (n === 1 ? '1 try left' : `${n ?? 0} tries left`)
 
 export function LockScreen({ mode }: { mode: 'setup' | 'locked' }) {
-  const [step, setStep] = useState<Step>(mode === 'setup' ? 'create' : 'enter')
+  const notice = useAuth((s) => s.notice)
+  const [step, setStep] = useState<Step>(mode === 'setup' ? 'key' : 'enter')
   const [code, setCode] = useState('')
   const [first, setFirst] = useState('')
-  const [msg, setMsg] = useState<string | null>(null)
+  const [setupKey, setSetupKey] = useState('')
+  const [msg, setMsg] = useState<string | null>(notice)
   const [busy, setBusy] = useState(false)
   const [success, setSuccess] = useState(false)
   const [lockedUntil, setLockedUntil] = useState(0)
   const [now, setNow] = useState(Date.now())
   const dots = useAnimationControls()
 
-  useEffect(() => { setStep(mode === 'setup' ? 'create' : 'enter'); setCode(''); setFirst(''); setMsg(null) }, [mode])
+  // Switching mode (e.g. the server says a passcode was reset) restarts the flow but keeps the
+  // server's notice so the user knows why.
+  useEffect(() => { setStep(mode === 'setup' ? 'key' : 'enter'); setCode(''); setFirst(''); setMsg(useAuth.getState().notice) }, [mode])
+
   useEffect(() => {
     if (!lockedUntil) return
-    const t = setInterval(() => setNow(Date.now()), 1000)
+    const t = setInterval(() => {
+      setNow(Date.now())
+      if (Date.now() >= lockedUntil) { setLockedUntil(0); setMsg(null) }
+    }, 1000)
     return () => clearInterval(t)
   }, [lockedUntil])
   const locked = lockedUntil > now
@@ -32,46 +42,59 @@ export function LockScreen({ mode }: { mode: 'setup' | 'locked' }) {
   const reject = useCallback((m: string) => {
     haptic([30, 50, 30])
     setMsg(m)
+    // Keyframe shake: a gesture a single spring can't express (CLAUDE.md allows these).
     void dots.start({ x: [0, -12, 12, -9, 9, -4, 4, 0], transition: { duration: 0.45 } })
     setTimeout(() => setCode(''), 250)
   }, [dots])
 
-  const handle = useCallback(async (full: string) => {
+  const fail = useCallback((r: Extract<AuthResult, { ok: false }>) => {
+    if (r.error === 'wrong') return reject(`Wrong passcode · ${tries(r.remaining)}`)
+    if (r.error === 'bad_key') { setStep('key'); return reject(`Wrong setup key · ${tries(r.remaining)}`) }
+    if (r.error === 'locked') {
+      setLockedUntil(Date.now() + (r.retryAfter ?? 900) * 1000); setNow(Date.now())
+      return reject(r.global ? 'Sign-in paused after many failed attempts' : 'Too many attempts')
+    }
+    if (r.error === 'weak') { setStep('create'); setFirst(''); return reject('Too easy to guess — try another') }
+    if (r.error === 'reset' || r.error === 'taken') return // checkAuth switches mode and supplies the notice
+    reject("Can't reach the server — check your connection")
+  }, [reject])
+
+  const done = useCallback(() => { setSuccess(true); haptic([10, 40, 10, 40, 30]); setTimeout(openApp, 520) }, [])
+
+  const submitCode = useCallback(async (full: string) => {
     if (step === 'create') {
       if (isWeak(full)) return reject('Too easy to guess — try another')
       setFirst(full); setCode(''); setMsg(null); setStep('confirm'); haptic(8)
       return
     }
-    if (step === 'confirm' && full !== first) {
-      setStep('create'); setFirst('')
-      return reject("Codes didn't match — start again")
-    }
+    if (step === 'confirm' && full !== first) { setStep('create'); setFirst(''); return reject("Codes didn't match — start again") }
     setBusy(true)
-    const r: AuthResult = step === 'enter' ? await unlock(full) : await createPasscode(full)
+    const r = step === 'enter' ? await unlock(full) : await createPasscode(setupKey, full)
     setBusy(false)
-    if (r.ok) { setSuccess(true); haptic([10, 40, 10, 40, 30]); setTimeout(openApp, 520); return }
-    if (r.error === 'wrong') return reject(r.remaining === 1 ? 'Wrong passcode · 1 try left' : `Wrong passcode · ${r.remaining} tries left`)
-    if (r.error === 'locked') { setLockedUntil(Date.now() + (r.retryAfter ?? 900) * 1000); setNow(Date.now()); return reject('Too many attempts') }
-    if (r.error === 'weak') { setStep('create'); setFirst(''); return reject('Too easy to guess — try another') }
-    if (r.error === 'taken') return reject('A passcode is already set — enter it')
-    reject("Can't reach the server — check your connection")
-  }, [step, first, reject])
+    if (r.ok) done()
+    else fail(r)
+  }, [step, first, setupKey, reject, done, fail])
+
+  // The 6th digit triggers submit from an effect, never from inside a state updater (updaters can
+  // run twice under StrictMode/concurrent rendering, which would double-submit).
+  const submitted = useRef('')
+  useEffect(() => {
+    if (code.length < LEN) { submitted.current = ''; return }
+    if (submitted.current === code) return
+    submitted.current = code
+    const t = setTimeout(() => void submitCode(code), 120) // let the last dot land
+    return () => clearTimeout(t)
+  }, [code, submitCode])
 
   const press = useCallback((k: string) => {
-    if (busy || success || locked) return
+    if (busy || success || locked || step === 'key') return
     if (k === 'del') { haptic(4); setCode((c) => c.slice(0, -1)); return }
     if (!/^\d$/.test(k)) return
     haptic(6)
     setMsg(null)
-    setCode((c) => {
-      if (c.length >= LEN) return c
-      const next = c + k
-      if (next.length === LEN) setTimeout(() => void handle(next), 120) // let the last dot land
-      return next
-    })
-  }, [busy, success, locked, handle])
+    setCode((c) => (c.length >= LEN ? c : c + k))
+  }, [busy, success, locked, step])
 
-  // Physical keyboard support (desktop, or phones with a hardware keyboard).
   const pressRef = useRef(press)
   pressRef.current = press
   useEffect(() => {
@@ -83,38 +106,64 @@ export function LockScreen({ mode }: { mode: 'setup' | 'locked' }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const title = step === 'create' ? 'Create a passcode' : step === 'confirm' ? 'Confirm passcode' : 'Enter passcode'
-  const sub = locked ? `Too many attempts · try again in ${mins((lockedUntil - now) / 1000)} min`
-    : msg ?? (step === 'create' ? '6 digits. Protects sync and AI features.' : step === 'confirm' ? 'Enter it once more' : 'Welcome back')
+  const submitKey = async () => {
+    if (!setupKey.trim() || busy || locked) return
+    setBusy(true)
+    const r = await checkSetupKey(setupKey.trim())
+    setBusy(false)
+    if (r.ok) { haptic(8); setMsg(null); setStep('create') }
+    else fail(r)
+  }
+
+  const title = { key: 'Set up rep', create: 'Create a passcode', confirm: 'Confirm passcode', enter: 'Enter passcode' }[step]
+  const sub = locked ? `${msg ?? 'Too many attempts'} · try again in ${mins((lockedUntil - now) / 1000)} min`
+    : msg ?? { key: 'Enter the setup key you saved in Vercel', create: '6 digits. Protects sync and AI features.', confirm: 'Enter it once more', enter: 'Welcome back' }[step]
 
   return (
     <motion.div className="lock" role="dialog" aria-modal="true" aria-label={title}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 1.04, transition: { duration: 0.35 } }}>
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 1.04, transition: SPRING }}>
       <div className="lock-top">
         <div className="h1" style={{ fontSize: 28 }}>rep<span style={{ color: 'var(--accent)' }}>.</span></div>
-        <motion.div key={step} className="lock-title" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 32 }}>{title}</motion.div>
+        <motion.div key={step} className="lock-title" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={SPRING}>{title}</motion.div>
         <div className={`lock-sub ${msg || locked ? 'err' : ''}`} aria-live="polite">{sub}</div>
-        <motion.div className="lock-dots" animate={dots}>
-          {Array.from({ length: LEN }, (_, i) => {
-            const filled = i < code.length || success
-            return (
-              <motion.span key={i} className={`lock-dot ${filled ? 'on' : ''} ${success ? 'ok' : ''}`}
-                animate={success ? { scale: [1, 1.35, 1] } : { scale: filled ? [1, 1.3, 1] : 1 }}
-                transition={success ? { delay: i * 0.05, duration: 0.3 } : { type: 'spring', stiffness: 600, damping: 30 }} />
-            )
-          })}
-        </motion.div>
+        {step !== 'key' && (
+          <motion.div className="lock-dots" animate={dots}>
+            {Array.from({ length: LEN }, (_, i) => {
+              const filled = i < code.length || success
+              return (
+                <motion.span key={i} className={`lock-dot ${filled ? 'on' : ''} ${success ? 'ok' : ''}`}
+                  initial={false} animate={{ scale: success ? 1.25 : 1 }}
+                  transition={{ type: 'spring', stiffness: 600, damping: 30, delay: success ? i * 0.05 : 0 }} />
+              )
+            })}
+          </motion.div>
+        )}
       </div>
-      <div className="lock-pad" aria-disabled={busy || locked}>
-        {KEYS.map((k, i) => k === '' ? <span key={i} /> : (
-          <motion.button key={i} className={`lock-key ${k === 'del' ? 'del' : ''}`} whileTap={{ scale: 0.88 }}
-            onClick={() => press(k)} disabled={locked || busy} aria-label={k === 'del' ? 'Delete' : k}>
-            {k === 'del' ? (
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 5H9l-6 7 6 7h12a1 1 0 001-1V6a1 1 0 00-1-1zM17 9l-5 6M12 9l5 6" /></svg>
-            ) : k}
-          </motion.button>
-        ))}
-      </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        {step === 'key' ? (
+          <motion.form key="key" className="lock-keyform" onSubmit={(e) => { e.preventDefault(); void submitKey() }}
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={SPRING}>
+            <motion.input animate={dots} className="lock-keyinput" type="password" autoComplete="off" autoFocus placeholder="Setup key"
+              value={setupKey} onChange={(e) => { setSetupKey(e.target.value); setMsg(null) }} disabled={locked} aria-label="Setup key" />
+            <motion.button whileTap={{ scale: 0.97 }} className="btn btn-primary btn-block" style={{ height: 54 }} disabled={!setupKey.trim() || busy || locked}>
+              Continue
+            </motion.button>
+          </motion.form>
+        ) : (
+          <motion.div key="pad" className="lock-pad" aria-disabled={busy || locked}
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING}>
+            {KEYS.map((k, i) => k === '' ? <span key={i} /> : (
+              <motion.button key={i} className={`lock-key ${k === 'del' ? 'del' : ''}`} whileTap={{ scale: 0.88 }}
+                onClick={() => press(k)} disabled={locked || busy} aria-label={k === 'del' ? 'Delete' : k}>
+                {k === 'del' ? (
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 5H9l-6 7 6 7h12a1 1 0 001-1V6a1 1 0 00-1-1zM17 9l-5 6M12 9l5 6" /></svg>
+                ) : k}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

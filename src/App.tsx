@@ -57,7 +57,13 @@ export default function App() {
       <AnimatePresence>
         {(phase === 'setup' || phase === 'locked') && <LockScreen key="lock" mode={phase} />}
       </AnimatePresence>
-      {phase === 'checking' && <div className="lock" aria-busy="true" />}
+      {phase === 'checking' && (
+        <div className="lock" aria-busy="true" style={{ justifyContent: 'center' }}>
+          <motion.div className="h1" style={{ fontSize: 28 }} animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.4, repeat: Infinity }}>
+            rep<span style={{ color: 'var(--accent)' }}>.</span>
+          </motion.div>
+        </div>
+      )}
       <Toaster />
     </div>
   )

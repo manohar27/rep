@@ -21,9 +21,12 @@ export function getDb(): Db | null {
 
 export const setDbForTests = (d: Db) => { db = d; schema = null }
 
-// Idempotent bootstrap, run once per server instance before the first query.
+// Idempotent bootstrap, run once per server instance. A single probe query skips the DDL when
+// the schema already exists, so warm databases cost one round-trip per cold start.
 export function ensureSchema(d: Db) {
   schema ??= (async () => {
+    const [probe] = await d.query<{ ok: boolean }>(`select to_regclass('auth_attempts_at') is not null as ok`)
+    if (probe?.ok) return
     await d.query(`create table if not exists owner (
       id int primary key default 1 check (id = 1),
       passcode_hash text not null,
@@ -39,6 +42,7 @@ export function ensureSchema(d: Db) {
       ok boolean not null,
       at timestamptz not null default now())`)
     await d.query(`create index if not exists auth_attempts_ip_at on auth_attempts (ip, at)`)
+    await d.query(`create index if not exists auth_attempts_at on auth_attempts (at)`) // last: doubles as the probe
   })().catch((e) => { schema = null; throw e })
   return schema
 }

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
 import { Dots, Lock, Play, Plus, Trash, Trophy } from '../components/Icons'
-import { lock } from '../lib/auth'
+import { lock, useAuth } from '../lib/auth'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toast'
 import { getExercise, haptic, useStore, volumeOf, workingSets, type Template } from '../lib/store'
@@ -20,6 +20,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
   const history = useStore((s) => s.history)
   const custom = useStore((s) => s.custom)
   const active = useStore((s) => s.active)
+  const authAvailable = useAuth((s) => s.available)
   const { startEmpty, startFromTemplate, deleteTemplate } = useStore.getState()
   const [preview, setPreview] = useState<Template | null>(null)
   const [menu, setMenu] = useState<string | null>(null)
@@ -35,10 +36,17 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
         <div className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h1 className="h1">rep<span style={{ color: 'var(--accent)' }}>.</span></h1>
-          <motion.button className="icon-btn" whileTap={{ scale: 0.88 }} aria-label="Lock"
-            onClick={async () => { haptic(8); if (!(await lock())) toast("Can't lock while offline") }}>
-            <Lock />
-          </motion.button>
+          {authAvailable && (
+            <motion.button className="icon-btn" whileTap={{ scale: 0.88 }} aria-label="Lock"
+              onClick={async () => {
+                haptic(8)
+                const r = await lock()
+                if (r === 'offline') toast("Can't lock while offline")
+                else if (r === 'unavailable') toast("Can't lock right now")
+              }}>
+              <Lock />
+            </motion.button>
+          )}
         </div>
       </motion.div>
 

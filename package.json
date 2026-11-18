@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && tsc --noEmit -p tsconfig.api.json && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "esbuild tests/auth.test.ts --bundle --platform=node --format=cjs --external:@electric-sql/pglite --log-level=warning --outfile=node_modules/.cache/rep-tests/auth.test.cjs && node node_modules/.cache/rep-tests/auth.test.cjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",

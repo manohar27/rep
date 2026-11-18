@@ -14,7 +14,7 @@ Every change must hold to these three. If a feature can't, rethink the feature.
 ### 2. Micro-interactions
 - Every tap gets feedback: a `whileTap` scale, a state change, and `haptic()` where it confirms something.
 - Motion explains state, it doesn't decorate: things enter from where they come from, and leave toward where they go.
-- Use springs (framer-motion `type: 'spring'`), not linear tweens. Taps and toggles snappy (stiffness 400–600); screen/card/fill transitions softer (250–400). Damping ~30–38, no visible wobble.
+- Use springs (framer-motion `type: 'spring'`), not linear tweens. Exception: multi-step keyframe gestures a single spring can't express (error shake, check pop) may use short keyframe tweens. Taps and toggles snappy (stiffness 400–600); screen/card/fill transitions softer (250–400). Damping ~30–38, no visible wobble.
 - Numbers that change animate (`<Ticker>`). Completions celebrate briefly (check pop, row fill, confetti on finish).
 - Respect `prefers-reduced-motion` — `MotionConfig reducedMotion="user"` is set at the root; don't bypass it.
 
@@ -37,7 +37,10 @@ Every change must hold to these three. If a feature can't, rethink the feature.
 
 - `api/` holds Vercel Functions (Web `Request` → `Response` handlers). `api/_lib/` is shared server code (not routed). Relative imports in `api/` use `.js` extensions (NodeNext ESM). `shared/` is code used by both client and server.
 - Database: Postgres (Neon via the Vercel Marketplace, env `DATABASE_URL`). `api/_lib/db.ts` exposes a tiny `Db.query` interface; schema is bootstrapped idempotently by `ensureSchema`. Tests swap in PGlite via `setDbForTests`.
-- Auth is a single-owner 6-digit passcode (`api/_lib/auth.ts`): scrypt-hashed, setup only while no owner exists, session = random token in an `HttpOnly; Secure; SameSite=Strict` cookie (only its SHA-256 stored), 5 failures / IP / 15 min and 30 / hour globally. New server features must check `isAuthenticated(req, db)`.
+- Auth is a single-owner 6-digit passcode (`api/_lib/auth.ts`): scrypt-hashed; session = random token in an `HttpOnly; Secure; SameSite=Strict` cookie (only its SHA-256 stored, 90 days). New server features must check `isAuthenticated(req, db)`.
+- Setup needs env `REP_SETUP_KEY` (chosen by the owner in Vercel; never in code or chat). Unset = setup disabled and the app simply opens. Setup closes once an owner exists; reset = delete the `owner` row.
+- Rate limits: every attempt (passcode or setup key) is inserted as a failure *before* checking, then counted — this keeps concurrent bursts within limits. 5 failures / IP / 15 min (reset by a success); 30 / hour globally, except IPs with a successful sign-in in the last 90 days (so the cap can't lock the owner out).
+- Tests: `npm test` runs `tests/*.test.ts` against PGlite.
 - Offline-first wins: the client (`src/lib/auth.ts`) opens the app if the API is unreachable, has no database, or isn't JSON. The lock screen only appears when the server positively says "locked" or "setup". Never put secrets in client code.
 
 ## Conventions

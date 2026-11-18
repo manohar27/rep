@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { EXERCISE_BY_ID, type Exercise, type Muscle, type Equipment } from '../data/exercises'
-import { isTimed, isWarmup, sessionPRs, type PRHit } from './records'
+import { counts, isTimed, isWarmup, sessionPRs, setVolume, type PRHit } from './records'
 export { isWarmup }
 
 export type SetType = 'normal' | 'warmup' | 'failure'
@@ -159,15 +159,14 @@ export const usePrevious = (exerciseId: string) =>
 export const getExercise = (id: string, custom: Exercise[]): Exercise =>
   EXERCISE_BY_ID[id] ?? custom.find((c) => c.id === id) ?? { id, name: 'Unknown exercise', muscle: 'Full Body', equipment: 'Other', kind: 'weight' }
 
-// Time-based exercises store minutes/seconds in weight/reps, so they never count toward kg volume (see isTimed).
-
-// Warm-ups are logged but excluded from working volume and set counts.
+// Warm-ups are logged but excluded from working volume and set counts. Time-based exercises store
+// minutes/seconds in weight/reps, so they never count toward kg volume. `onlyDone=false` is for history,
+// where every saved set was already checked.
 export const volumeOf = (s: Session, onlyDone = true) =>
-  s.exercises.reduce((v, se) => isTimed(se.exerciseId) ? v : v + se.sets.reduce((a, x) =>
-    a + ((!onlyDone || x.done) && !isWarmup(x) ? (parseFloat(x.weight) || 0) * (parseInt(x.reps) || 0) : 0), 0), 0)
+  s.exercises.reduce((v, se) => isTimed(se.exerciseId) ? v : v + se.sets.reduce((a, x) => a + setVolume(onlyDone ? x : { ...x, done: true }), 0), 0)
 
 export const workingSets = (s: Session, onlyDone = true) =>
-  s.exercises.reduce((a, se) => a + se.sets.filter((x) => (!onlyDone || x.done) && !isWarmup(x)).length, 0)
+  s.exercises.reduce((a, se) => a + se.sets.filter((x) => counts(onlyDone ? x : { ...x, done: true })).length, 0)
 
 // Free-form numeric input: accepts "," as decimal separator (EU keyboards), one dot, up to 2 decimals.
 // If both "," and "." appear, "," is a thousands separator and is dropped ("1,000.5" -> "1000.5").

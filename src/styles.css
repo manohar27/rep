@@ -267,6 +267,7 @@ input[type=number] { -moz-appearance: textfield; }
 @keyframes shine { to { transform: translateX(120%); } }
 @media (prefers-reduced-motion: reduce) { .pr-chip::after { display: none; } }
 .ex-title { text-align: left; border-radius: 10px; }
+.ex-name, .ex-tag { display: block; }
 .set-prev { display: flex; justify-content: center; align-items: center; }
 
 .rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }

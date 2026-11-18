@@ -16,17 +16,21 @@ export function ExerciseCard({ se, index, total, onSetDone, onHistory }: { se: S
   const isTime = ex.kind === 'time'
   const doneCount = se.sets.filter((s) => s.done).length
   const history = useStore((s) => s.history)
-  const prs = useMemo(() => exercisePRs(se, history), [se, history])
+  const blocks = useStore((s) => s.active?.exercises)
+  const prs = useMemo(() => exercisePRs(se, history, blocks), [se, history, blocks])
   const prBySet = useMemo(() => new Map(prs.filter((p) => p.setId).map((p) => [p.setId!, p])), [prs])
   const volumePR = prs.find((p) => p.kind === 'volume')
 
-  // Celebrate the moment this exercise's session volume first overtakes its best.
+  // Celebrate when a ✓ tap pushes session volume past the best — not when edits to an already
+  // checked set happen to cross the line (the chip still updates quietly).
   const volRef = useRef<HTMLSpanElement>(null)
   const hadVolumePR = useRef(!!volumePR)
+  const lastDone = useRef(doneCount)
   useEffect(() => {
-    if (volumePR && !hadVolumePR.current) { celebrateFrom(volRef.current, { n: 16 }); toast(`Volume PR · ${ex.name}`) }
+    if (volumePR && !hadVolumePR.current && doneCount > lastDone.current) { celebrateFrom(volRef.current, { n: 16 }); toast(`Volume PR · ${ex.name}`) }
     hadVolumePR.current = !!volumePR
-  }, [volumePR, ex.name])
+    lastDone.current = doneCount
+  }, [volumePR, doneCount, ex.name])
 
   return (
     <motion.div layout className="card ex"
@@ -34,12 +38,12 @@ export function ExerciseCard({ se, index, total, onSetDone, onHistory }: { se: S
       exit={{ opacity: 0, x: -60, scale: 0.95, transition: { duration: 0.2 } }}
       transition={{ type: 'spring', stiffness: 380, damping: 32 }} style={{ position: 'relative' }}>
       <div className="ex-head">
-        <button className="ex-title" onClick={() => { haptic(4); onHistory(se.exerciseId) }} aria-label={`${ex.name} history and records`}>
-          <div className="ex-name">{ex.name}</div>
-          <div className="ex-tag">{ex.equipment} · {ex.muscle} · <span className="mono">{doneCount}/{se.sets.length}</span> sets
+        <motion.button className="ex-title" whileTap={{ scale: 0.98 }} onClick={() => { haptic(4); onHistory(se.exerciseId) }} aria-label={`${ex.name} history and records`}>
+          <span className="ex-name">{ex.name}</span>
+          <span className="ex-tag">{ex.equipment} · {ex.muscle} · <span className="mono">{doneCount}/{se.sets.length}</span> sets
             <AnimatePresence>{volumePR && <> {' '}<PRChip ref={volRef} label="Volume" /></>}</AnimatePresence>
-          </div>
-        </button>
+          </span>
+        </motion.button>
         <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="Exercise options"><Dots /></button>
       </div>
       <AnimatePresence>

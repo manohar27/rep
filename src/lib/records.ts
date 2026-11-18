@@ -22,6 +22,8 @@ export const counts = (s: SetEntry) => s.done && !isWarmup(s)
 export const isTimed = (exerciseId: string) => EXERCISE_BY_ID[exerciseId]?.kind === 'time'
 const num = (s: string) => parseFloat(s) || 0
 const int = (s: string) => parseInt(s) || 0
+// The one definition of a set's working volume; store.volumeOf builds on it.
+export const setVolume = (s: SetEntry) => (counts(s) ? num(s.weight) * int(s.reps) : 0)
 export const fmtW = (w: number) => String(Math.round(w * 100) / 100)
 
 // Epley estimate; a true single is its own 1RM.
@@ -48,46 +50,58 @@ let cache: { history: CompletedSession[]; map: Map<string, Bests> } | null = nul
 export function bestsFrom(history: CompletedSession[]): Map<string, Bests> {
   if (cache?.history === history) return cache.map
   const map = new Map<string, Bests>()
-  for (const s of history) for (const se of s.exercises) {
-    if (isTimed(se.exerciseId)) continue
-    const b = map.get(se.exerciseId) ?? empty()
-    let vol = 0
-    for (const x of se.sets) if (counts(x)) { const w = num(x.weight), r = int(x.reps); absorb(b, w, r); vol += w * r }
-    b.bestVolume = Math.max(b.bestVolume, vol)
-    b.sessions++
-    map.set(se.exerciseId, b)
+  for (const s of history) {
+    // An exercise can appear in several blocks of one session; volume and session count are per session.
+    const vol = new Map<string, number>()
+    for (const se of s.exercises) {
+      if (isTimed(se.exerciseId)) continue
+      const working = se.sets.filter((x) => counts(x) && int(x.reps) > 0)
+      if (!working.length) continue // e.g. only warm-ups checked: not a baseline
+      const b = map.get(se.exerciseId) ?? empty()
+      for (const x of working) absorb(b, num(x.weight), int(x.reps))
+      map.set(se.exerciseId, b)
+      vol.set(se.exerciseId, (vol.get(se.exerciseId) ?? 0) + working.reduce((a, x) => a + setVolume(x), 0))
+    }
+    for (const [id, v] of vol) { const b = map.get(id)!; b.bestVolume = Math.max(b.bestVolume, v); b.sessions++ }
   }
   cache = { history, map }
   return map
 }
 
-// PRs set by one exercise block against all prior history. Sets are judged in order, so a later
-// heavier set also counts but an equal one doesn't. The first time an exercise is logged sets the
-// baseline and awards nothing (otherwise every set of a new exercise would be a "PR").
-export function exercisePRs(se: SessionExercise, history: CompletedSession[]): PRHit[] {
+// PRs set by one exercise block against all prior history *and* earlier blocks of the same exercise in
+// this session (`blocks`), so adding an exercise twice can't double-award. Sets are judged in order: a
+// later heavier set also counts, an equal one doesn't. An exercise's first ever session is the baseline
+// and awards nothing (otherwise every set of a new exercise would be a "PR"). The session Volume PR is
+// reported once, on the exercise's last block, using the volume of all its blocks.
+export function exercisePRs(se: SessionExercise, history: CompletedSession[], blocks: SessionExercise[] = [se]): PRHit[] {
   if (isTimed(se.exerciseId)) return []
   const prev = bestsFrom(history).get(se.exerciseId)
   if (!prev) return []
+  const same = blocks.filter((b) => b.exerciseId === se.exerciseId)
   const run = clone(prev)
+  for (const b of same.slice(0, Math.max(0, same.findIndex((b) => b.id === se.id))))
+    for (const x of b.sets) if (counts(x)) absorb(run, num(x.weight), int(x.reps))
   const hits: PRHit[] = []
-  let vol = 0
   for (const s of se.sets) {
     if (!counts(s)) continue
     const w = num(s.weight), r = int(s.reps)
     if (r <= 0) continue
+    // nRM needs a prior set of at least n reps to beat; a first-ever 8-rep back-off set isn't a record.
+    const rmBar = bestAtLeast(run, r)
     let hit: [PRKind, string] | null = null
     if (w > 0 && w > run.maxWeight) hit = ['heaviest', 'Heaviest']
-    else if (w > 0 && r <= 12 && w > bestAtLeast(run, r)) hit = ['rm', `${r}RM`]
+    else if (w > 0 && r <= 12 && rmBar > 0 && w > rmBar) hit = ['rm', `${r}RM`]
     else if (w > 0 && w * r > run.bestSet) hit = ['bestSet', 'Best set']
     else if (w === 0 && r > run.maxReps) hit = ['reps', 'Most reps']
     if (hit) hits.push({ exerciseId: se.exerciseId, setId: s.id, kind: hit[0], label: hit[1], detail: w > 0 ? `${fmtW(w)} kg × ${r}` : `${r} reps` })
     absorb(run, w, r)
-    vol += w * r
   }
-  if (vol > 0 && prev.bestVolume > 0 && vol > prev.bestVolume)
+  const isLast = same[same.length - 1]?.id === se.id
+  const vol = same.reduce((a, b) => a + b.sets.reduce((v, x) => v + setVolume(x), 0), 0)
+  if (isLast && vol > 0 && prev.bestVolume > 0 && vol > prev.bestVolume)
     hits.push({ exerciseId: se.exerciseId, kind: 'volume', label: 'Volume', detail: `${Math.round(vol).toLocaleString()} kg` })
   return hits
 }
 
 export const sessionPRs = (exercises: SessionExercise[], history: CompletedSession[]) =>
-  exercises.flatMap((se) => exercisePRs(se, history))
+  exercises.flatMap((se) => exercisePRs(se, history, exercises))

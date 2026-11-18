@@ -12,7 +12,7 @@ export function PRSummary({ session, onClose }: { session: CompletedSession | nu
     <Sheet open={!!session && prs.length > 0} onClose={onClose}>
       <div className="sheet-head">
         <div>
-          <motion.div className="sheet-title" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 22 }}>
+          <motion.div className="sheet-title" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }}>
             {prs.length} new PR{prs.length === 1 ? '' : 's'}
           </motion.div>
           <div className="muted" style={{ fontSize: 13 }}>{session?.name}</div>

@@ -25,7 +25,7 @@ export default function App() {
             onFinished={(s, tpl) => {
               celebrateBig()
               if (s.prs?.length) setTimeout(() => setSummary(s), 450) // let the screen transition land first
-              else toast(tpl ? 'Workout & template saved' : 'Workout saved')
+              toast(tpl ? 'Workout & template saved' : 'Workout saved')
               setView('home')
             }} />
         ) : (

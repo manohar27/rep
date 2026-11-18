@@ -1,13 +1,16 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { EXERCISE_BY_ID, type Exercise, type Muscle, type Equipment } from '../data/exercises'
+import { isTimed, isWarmup, sessionPRs, type PRHit } from './records'
+export { isWarmup }
 
 export type SetType = 'normal' | 'warmup' | 'failure'
 // `type` is optional so sessions persisted before set types existed still load as normal sets.
 export interface SetEntry { id: string; weight: string; reps: string; done: boolean; type?: SetType }
 export interface SessionExercise { id: string; exerciseId: string; sets: SetEntry[] }
 export interface Session { id: string; name: string; startedAt: number; exercises: SessionExercise[]; templateId?: string }
-export interface CompletedSession extends Session { finishedAt: number }
+// `prs` is optional: sessions saved before PR tracking existed have none recorded.
+export interface CompletedSession extends Session { finishedAt: number; prs?: PRHit[] }
 export interface TemplateExercise { exerciseId: string; sets: { weight: string; reps: string; type?: SetType }[] }
 export interface Template { id: string; name: string; exercises: TemplateExercise[]; createdAt: number; lastUsedAt?: number }
 
@@ -111,6 +114,7 @@ export const useStore = create<State>()(
         }
         // Nothing checked off: there's no workout to record, so just close the session.
         if (!done.exercises.length) { set({ active: null }); return null }
+        done.prs = sessionPRs(done.exercises, get().history)
         set((st) => ({ active: null, history: [done, ...st.history] }))
         return done
       },
@@ -155,9 +159,7 @@ export const usePrevious = (exerciseId: string) =>
 export const getExercise = (id: string, custom: Exercise[]): Exercise =>
   EXERCISE_BY_ID[id] ?? custom.find((c) => c.id === id) ?? { id, name: 'Unknown exercise', muscle: 'Full Body', equipment: 'Other', kind: 'weight' }
 
-export const isWarmup = (s: SetEntry) => s.type === 'warmup'
-// Time-based exercises store minutes/seconds in weight/reps, so they never count toward kg volume.
-const isTimed = (exerciseId: string) => EXERCISE_BY_ID[exerciseId]?.kind === 'time'
+// Time-based exercises store minutes/seconds in weight/reps, so they never count toward kg volume (see isTimed).
 
 // Warm-ups are logged but excluded from working volume and set counts.
 export const volumeOf = (s: Session, onlyDone = true) =>

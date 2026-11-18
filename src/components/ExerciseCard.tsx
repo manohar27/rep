@@ -1,9 +1,13 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getExercise, haptic, isWarmup, sanitizeReps, sanitizeWeight, usePrevious, useStore, type SessionExercise, type SetEntry, type SetType } from '../lib/store'
+import { exercisePRs, type PRHit } from '../lib/records'
+import { celebrateFrom } from './Celebrate'
 import { Check, Dots, Down, Trash, Up } from './Icons'
+import { PRChip } from './PRChip'
+import { toast } from './Toast'
 
-export function ExerciseCard({ se, index, total, onSetDone }: { se: SessionExercise; index: number; total: number; onSetDone: () => void }) {
+export function ExerciseCard({ se, index, total, onSetDone, onHistory }: { se: SessionExercise; index: number; total: number; onSetDone: () => void; onHistory: (exerciseId: string) => void }) {
   const custom = useStore((s) => s.custom)
   const ex = getExercise(se.exerciseId, custom)
   const prev = usePrevious(se.exerciseId)
@@ -11,6 +15,18 @@ export function ExerciseCard({ se, index, total, onSetDone }: { se: SessionExerc
   const [menu, setMenu] = useState(false)
   const isTime = ex.kind === 'time'
   const doneCount = se.sets.filter((s) => s.done).length
+  const history = useStore((s) => s.history)
+  const prs = useMemo(() => exercisePRs(se, history), [se, history])
+  const prBySet = useMemo(() => new Map(prs.filter((p) => p.setId).map((p) => [p.setId!, p])), [prs])
+  const volumePR = prs.find((p) => p.kind === 'volume')
+
+  // Celebrate the moment this exercise's session volume first overtakes its best.
+  const volRef = useRef<HTMLSpanElement>(null)
+  const hadVolumePR = useRef(!!volumePR)
+  useEffect(() => {
+    if (volumePR && !hadVolumePR.current) { celebrateFrom(volRef.current, { n: 16 }); toast(`Volume PR · ${ex.name}`) }
+    hadVolumePR.current = !!volumePR
+  }, [volumePR, ex.name])
 
   return (
     <motion.div layout className="card ex"
@@ -18,10 +34,12 @@ export function ExerciseCard({ se, index, total, onSetDone }: { se: SessionExerc
       exit={{ opacity: 0, x: -60, scale: 0.95, transition: { duration: 0.2 } }}
       transition={{ type: 'spring', stiffness: 380, damping: 32 }} style={{ position: 'relative' }}>
       <div className="ex-head">
-        <div className="ex-title">
+        <button className="ex-title" onClick={() => { haptic(4); onHistory(se.exerciseId) }} aria-label={`${ex.name} history and records`}>
           <div className="ex-name">{ex.name}</div>
-          <div className="ex-tag">{ex.equipment} · {ex.muscle} · <span className="mono">{doneCount}/{se.sets.length}</span> sets</div>
-        </div>
+          <div className="ex-tag">{ex.equipment} · {ex.muscle} · <span className="mono">{doneCount}/{se.sets.length}</span> sets
+            <AnimatePresence>{volumePR && <> {' '}<PRChip ref={volRef} label="Volume" /></>}</AnimatePresence>
+          </div>
+        </button>
         <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="Exercise options"><Dots /></button>
       </div>
       <AnimatePresence>
@@ -43,7 +61,7 @@ export function ExerciseCard({ se, index, total, onSetDone }: { se: SessionExerc
         </div>
         <AnimatePresence initial={false}>
           {se.sets.map((s, i) => (
-            <SetRow key={s.id} seId={se.id} s={s} label={labelFor(se.sets, i)} prev={prev?.[i]} isTime={isTime} onDone={onSetDone} canDelete={se.sets.length > 1} />
+            <SetRow key={s.id} seId={se.id} s={s} label={labelFor(se.sets, i)} pr={prBySet.get(s.id)} prev={prev?.[i]} isTime={isTime} onDone={onSetDone} canDelete={se.sets.length > 1} />
           ))}
         </AnimatePresence>
       </div>
@@ -66,12 +84,24 @@ const TYPES: { t: SetType; badge: string; name: string; hint: string }[] = [
   { t: 'failure', badge: 'F', name: 'Failure', hint: 'Taken to failure · counts toward volume' },
 ]
 
-function SetRow({ seId, s, label, prev, isTime, onDone, canDelete }: { seId: string; s: SetEntry; label: string; prev?: SetEntry; isTime: boolean; onDone: () => void; canDelete: boolean }) {
+function SetRow({ seId, s, label, pr, prev, isTime, onDone, canDelete }: { seId: string; s: SetEntry; label: string; pr?: PRHit; prev?: SetEntry; isTime: boolean; onDone: () => void; canDelete: boolean }) {
   const { updateSet, removeSet } = useStore.getState()
   const [typeMenu, setTypeMenu] = useState(false)
   const type = s.type ?? 'normal'
   // The red delete layer only fades in as the row is swiped, so it never bleeds through at rest.
   const x = useMotionValue(0)
+  // A PR is celebrated only on the tap that completes the set — later edits to a done set update
+  // the badge quietly instead of re-firing confetti on every keystroke.
+  const chipRef = useRef<HTMLSpanElement>(null)
+  const wasDone = useRef(s.done)
+  useEffect(() => {
+    if (s.done && !wasDone.current && pr) {
+      celebrateFrom(chipRef.current)
+      haptic([15, 40, 15, 40, 50])
+      toast(`New PR · ${pr.label} · ${pr.detail}`)
+    }
+    wasDone.current = s.done
+  }, [s.done, pr])
   const delOpacity = useTransform(x, [-40, -4], [1, 0])
   const toggle = () => {
     const done = !s.done
@@ -105,7 +135,9 @@ function SetRow({ seId, s, label, prev, isTime, onDone, canDelete }: { seId: str
             </motion.span>
           </AnimatePresence></span>
         </motion.button>
-        <span className="set-prev">{prev ? (prev.weight ? `${prev.weight}×${prev.reps}` : prev.reps) : '—'}</span>
+        <span className="set-prev">
+          {s.done && pr ? <PRChip ref={chipRef} key={pr.label} label={pr.label} /> : prev ? (prev.weight ? `${prev.weight}×${prev.reps}` : prev.reps) : '—'}
+        </span>
         <input className="set-in" inputMode="decimal" type="text" autoComplete="off" placeholder={prev?.weight || '0'} value={s.weight}
           onChange={(e) => updateSet(seId, s.id, { weight: sanitizeWeight(e.target.value) })} onFocus={(e) => e.target.select()} aria-label="Weight" />
         <input className="set-in" inputMode="numeric" type="text" autoComplete="off" placeholder={prev?.reps || '0'} value={s.reps}

@@ -1,15 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { Burst } from './components/Burst'
+import { Celebrations, celebrateBig } from './components/Celebrate'
+import { PRSummary } from './components/PRSummary'
 import { Toaster, toast } from './components/Toast'
-import { useStore } from './lib/store'
+import { useStore, type CompletedSession } from './lib/store'
 import { HomeScreen } from './screens/HomeScreen'
 import { fmtDur, SessionScreen } from './screens/SessionScreen'
 
 export default function App() {
   const active = useStore((s) => s.active)
   const [view, setView] = useState<'home' | 'session'>(active ? 'session' : 'home')
-  const [burst, setBurst] = useState(0)
+  const [summary, setSummary] = useState<CompletedSession | null>(null)
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => { if (!active && view === 'session') setView('home') }, [active, view])
@@ -21,7 +22,12 @@ export default function App() {
       <AnimatePresence mode="wait">
         {view === 'session' && active ? (
           <SessionScreen key="session" onMinimize={() => setView('home')}
-            onFinished={(_s, tpl) => { setBurst((b) => b + 1); toast(tpl ? 'Workout & template saved' : 'Workout saved'); setView('home') }} />
+            onFinished={(s, tpl) => {
+              celebrateBig()
+              if (s.prs?.length) setTimeout(() => setSummary(s), 450) // let the screen transition land first
+              else toast(tpl ? 'Workout & template saved' : 'Workout saved')
+              setView('home')
+            }} />
         ) : (
           <HomeScreen key="home" onStart={() => setView('session')} />
         )}
@@ -42,7 +48,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {burst > 0 && <Burst key={burst} seed={burst} />}
+      <PRSummary session={summary} onClose={() => setSummary(null)} />
+      <Celebrations />
       <Toaster />
     </div>
   )

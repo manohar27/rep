@@ -1,6 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExerciseCard } from '../components/ExerciseCard'
+import { ExerciseHistory } from '../components/ExerciseHistory'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { Bookmark, Down, Dumbbell, Plus, Trash } from '../components/Icons'
 import { RestTimer } from '../components/RestTimer'
@@ -24,6 +25,7 @@ export function SessionScreen({ onMinimize, onFinished }: { onMinimize: () => vo
   const active = last.current!
   const { renameSession, addExercises, discard, finish, saveTemplate } = useStore.getState()
   const [picker, setPicker] = useState(false)
+  const [historyFor, setHistoryFor] = useState<string | null>(null)
   const [finishing, setFinishing] = useState(false)
   const [savingTpl, setSavingTpl] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
@@ -58,7 +60,7 @@ export function SessionScreen({ onMinimize, onFinished }: { onMinimize: () => vo
         <LayoutGroup>
           <AnimatePresence initial={false}>
             {active.exercises.map((se, i) => (
-              <ExerciseCard key={se.id} se={se} index={i} total={active.exercises.length} onSetDone={onSetDone} />
+              <ExerciseCard key={se.id} se={se} index={i} total={active.exercises.length} onSetDone={onSetDone} onHistory={setHistoryFor} />
             ))}
           </AnimatePresence>
           <motion.button layout whileTap={{ scale: 0.97 }} className="add-ex" onClick={() => { haptic(6); setPicker(true) }}>
@@ -72,6 +74,8 @@ export function SessionScreen({ onMinimize, onFinished }: { onMinimize: () => vo
       </div>
 
       <RestTimer endsAt={rest?.endsAt ?? null} total={rest?.total ?? REST} onChange={(endsAt, total) => setRest({ endsAt, total })} onClose={closeRest} />
+
+      <ExerciseHistory exerciseId={historyFor} onClose={() => setHistoryFor(null)} />
 
       <ExercisePicker open={picker} onClose={() => setPicker(false)} onAdd={addExercises} />
 

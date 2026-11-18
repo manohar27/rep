@@ -222,7 +222,7 @@ input { font: inherit; color: inherit; }
 .toast { position: fixed; top: calc(var(--safe-top) + 14px); left: 50%; z-index: 80; padding: 10px 16px; border-radius: 999px; background: var(--text); color: var(--bg); font-weight: 700; font-size: 14px; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 
 .burst { position: fixed; inset: 0; pointer-events: none; z-index: 70; overflow: hidden; }
-.burst i { position: absolute; left: 50%; top: 40%; width: 8px; height: 14px; border-radius: 2px; }
+.burst i { position: absolute; margin: -4px 0 0 -4px; }
 
 .menu { position: absolute; right: 8px; top: 40px; z-index: 5; background: var(--card-2); border: 1px solid var(--line); border-radius: 14px; padding: 6px; min-width: 170px; box-shadow: 0 10px 30px rgba(0,0,0,.5); transform-origin: top right; }
 .menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border-radius: 9px; font-size: 14px; font-weight: 600; text-align: left; }
@@ -248,3 +248,40 @@ input[type=number] { -moz-appearance: textfield; }
 /* Enlarge the badge's hit area to ≥ 40px without growing the visual. */
 .set-num::before { content: ''; position: absolute; inset: -4px; }
 .set-num-clip { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; display: grid; place-items: center; }
+
+/* ---------- PRs ---------- */
+:root { --gold: #ffd23d; --gold-soft: rgba(255, 210, 61, 0.14); }
+.pr-chip {
+  display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;
+  height: 20px; padding: 0 7px; border-radius: 999px; position: relative; overflow: hidden;
+  background: var(--gold-soft); color: var(--gold); font-family: var(--mono); font-weight: 700; font-size: 11px; white-space: nowrap;
+}
+.pr-chip svg { flex-shrink: 0; }
+.pr-chip.big { height: 26px; padding: 0 10px; font-size: 13px; gap: 5px; }
+/* one-off shine sweep when the chip appears */
+.pr-chip::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.45) 50%, transparent 70%);
+  animation: shine 0.9s 0.25s ease-out forwards;
+}
+@keyframes shine { to { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { .pr-chip::after { display: none; } }
+.ex-title { text-align: left; border-radius: 10px; }
+.set-prev { display: flex; justify-content: center; align-items: center; }
+
+.rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+.rec { padding: 12px; border-radius: 14px; background: var(--card); }
+.rec-v { font-family: var(--mono); font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+.rec-l { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; }
+.rm-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.rm { padding: 6px 10px; border-radius: 10px; background: var(--card); font-family: var(--mono); font-size: 13px; }
+.rm b { color: var(--muted); font-weight: 700; margin-right: 6px; }
+.past { padding: 12px 0; border-top: 1px solid var(--line); }
+.past-date { font-size: 13px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+.past-sets { display: flex; flex-wrap: wrap; gap: 6px; }
+.past-set { font-family: var(--mono); font-size: 13px; padding: 4px 8px; border-radius: 8px; background: var(--card); display: inline-flex; gap: 6px; align-items: center; }
+.past-set.warm { color: var(--warm); }
+.past-set.pr { background: var(--gold-soft); color: var(--gold); }
+.pr-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.pr-item { padding: 12px 14px; border-radius: 16px; background: var(--card); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.hist-pr { color: var(--gold); font-family: var(--mono); font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }

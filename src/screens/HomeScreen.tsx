@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
-import { Dots, Play, Plus, Trash } from '../components/Icons'
+import { Dots, Play, Plus, Trash, Trophy } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toast'
 import { getExercise, haptic, useStore, volumeOf, workingSets, type Template } from '../lib/store'
@@ -83,7 +83,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
           <motion.div variants={item} key={h.id} className="card hist">
             <div style={{ minWidth: 0 }}>
               <div className="hist-name">{h.name}</div>
-              <div className="hist-sub">{ago(h.finishedAt)} · {fmtDur(h.finishedAt - h.startedAt)} · {h.exercises.length} exercise{h.exercises.length === 1 ? "" : "s"}</div>
+              <div className="hist-sub">{h.prs?.length ? <><span className="hist-pr"><Trophy width={12} height={12} />{h.prs.length}</span> · </> : null}{ago(h.finishedAt)} · {fmtDur(h.finishedAt - h.startedAt)} · {h.exercises.length} exercise{h.exercises.length === 1 ? "" : "s"}</div>
             </div>
             <div className="hist-stat"><b>{Math.round(volumeOf(h, false)).toLocaleString()}</b> kg<br /><b>{workingSets(h, false)}</b> sets</div>
           </motion.div>

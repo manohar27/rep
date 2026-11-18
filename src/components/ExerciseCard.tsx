@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { useState } from 'react'
-import { getExercise, haptic, sanitizeReps, sanitizeWeight, usePrevious, useStore, type SessionExercise, type SetEntry, type SetType } from '../lib/store'
+import { getExercise, haptic, isWarmup, sanitizeReps, sanitizeWeight, usePrevious, useStore, type SessionExercise, type SetEntry, type SetType } from '../lib/store'
 import { Check, Dots, Down, Trash, Up } from './Icons'
 
 export function ExerciseCard({ se, index, total, onSetDone }: { se: SessionExercise; index: number; total: number; onSetDone: () => void }) {
@@ -52,11 +52,12 @@ export function ExerciseCard({ se, index, total, onSetDone }: { se: SessionExerc
   )
 }
 
-// Warm-ups read "W", failure sets "F"; only the remaining working sets are numbered.
+// Warm-ups read "W" and aren't numbered; failure sets read "F" but still take a working-set number,
+// so the numbering always agrees with the Sets count.
 function labelFor(sets: SetEntry[], i: number) {
   if (sets[i].type === 'warmup') return 'W'
   if (sets[i].type === 'failure') return 'F'
-  return String(sets.slice(0, i + 1).filter((x) => (x.type ?? 'normal') === 'normal').length)
+  return String(sets.slice(0, i + 1).filter((x) => !isWarmup(x)).length)
 }
 
 const TYPES: { t: SetType; badge: string; name: string; hint: string }[] = [
@@ -81,7 +82,7 @@ function SetRow({ seId, s, label, prev, isTime, onDone, canDelete }: { seId: str
     updateSet(seId, s.id, patch)
     haptic(done ? [12, 30, 18] : 6)
     // Warm-ups don't trigger the rest timer — you usually go straight to the next one.
-    if (done && type !== 'warmup') onDone()
+    if (done && !isWarmup(s)) onDone()
   }
   const setType = (t: SetType) => { haptic(8); updateSet(seId, s.id, { type: t }); setTypeMenu(false) }
   const onDragEnd = (_: unknown, info: PanInfo) => {
@@ -98,11 +99,11 @@ function SetRow({ seId, s, label, prev, isTime, onDone, canDelete }: { seId: str
         drag={canDelete ? 'x' : false} dragDirectionLock dragConstraints={{ left: 0, right: 0 }} dragElastic={{ left: 0.5, right: 0 }} onDragEnd={onDragEnd}>
         <motion.div className="set-bg" initial={false} animate={{ scaleX: s.done ? 1 : 0, opacity: s.done ? 1 : 0 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }} />
         <motion.button className="set-num" onClick={() => { haptic(4); setTypeMenu((v) => !v) }} whileTap={{ scale: 0.85 }} aria-label={`Set ${label}, change set type`}>
-          <AnimatePresence mode="popLayout" initial={false}>
+          <span className="set-num-clip"><AnimatePresence mode="popLayout" initial={false}>
             <motion.span key={label} initial={{ y: 8, opacity: 0, scale: 0.6 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -8, opacity: 0, scale: 0.6 }} transition={{ type: 'spring', stiffness: 600, damping: 30 }}>
               {label}
             </motion.span>
-          </AnimatePresence>
+          </AnimatePresence></span>
         </motion.button>
         <span className="set-prev">{prev ? (prev.weight ? `${prev.weight}×${prev.reps}` : prev.reps) : '—'}</span>
         <input className="set-in" inputMode="decimal" type="text" autoComplete="off" placeholder={prev?.weight || '0'} value={s.weight}

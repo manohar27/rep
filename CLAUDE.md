@@ -14,7 +14,7 @@ Every change must hold to these three. If a feature can't, rethink the feature.
 ### 2. Micro-interactions
 - Every tap gets feedback: a `whileTap` scale, a state change, and `haptic()` where it confirms something.
 - Motion explains state, it doesn't decorate: things enter from where they come from, and leave toward where they go.
-- Use springs (framer-motion `type: 'spring'`), not linear tweens. Keep them snappy: stiffness 400–600, damping 30–38.
+- Use springs (framer-motion `type: 'spring'`), not linear tweens. Taps and toggles snappy (stiffness 400–600); screen/card/fill transitions softer (250–400). Damping ~30–38, no visible wobble.
 - Numbers that change animate (`<Ticker>`). Completions celebrate briefly (check pop, row fill, confetti on finish).
 - Respect `prefers-reduced-motion` — `MotionConfig reducedMotion="user"` is set at the root; don't bypass it.
 
@@ -36,6 +36,7 @@ Every change must hold to these three. If a feature can't, rethink the feature.
 ## Conventions
 
 - Weight is stored as a string (keeps exactly what the user typed, e.g. `"62.5"`); parse with `parseFloat` only when computing.
-- Warm-up sets are logged but excluded from volume and set counts (`volumeOf`, `workingSets`).
+- Warm-up sets are logged but excluded from volume and set counts (`volumeOf`, `workingSets`); use `isWarmup`, don't re-check `type` inline.
+- Only checked (✓) sets are saved to history on finish. Time-based exercises never count toward kg volume.
 - `npm run build` (type-check + build) must pass before committing.
 - Branches: `feat/*` for work, merged into `main`. Vercel deploys every push; `main` is production.

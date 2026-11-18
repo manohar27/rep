@@ -105,10 +105,13 @@ export const useStore = create<State>()(
           ...a,
           finishedAt: Date.now(),
           exercises: a.exercises
-            .map((se) => ({ ...se, sets: se.sets.filter((s) => s.done || (s.reps && s.reps !== '0')) }))
+            // Only checked sets are real: unchecked ones may just be pre-filled from a template or history.
+            .map((se) => ({ ...se, sets: se.sets.filter((s) => s.done) }))
             .filter((se) => se.sets.length),
         }
-        set((st) => ({ active: null, history: [done, ...st.history].slice(0, 200) }))
+        // Nothing checked off: there's no workout to record, so just close the session.
+        if (!done.exercises.length) { set({ active: null }); return null }
+        set((st) => ({ active: null, history: [done, ...st.history] }))
         return done
       },
       discard: () => set({ active: null }),
@@ -153,22 +156,26 @@ export const getExercise = (id: string, custom: Exercise[]): Exercise =>
   EXERCISE_BY_ID[id] ?? custom.find((c) => c.id === id) ?? { id, name: 'Unknown exercise', muscle: 'Full Body', equipment: 'Other', kind: 'weight' }
 
 export const isWarmup = (s: SetEntry) => s.type === 'warmup'
+// Time-based exercises store minutes/seconds in weight/reps, so they never count toward kg volume.
+const isTimed = (exerciseId: string) => EXERCISE_BY_ID[exerciseId]?.kind === 'time'
 
 // Warm-ups are logged but excluded from working volume and set counts.
 export const volumeOf = (s: Session, onlyDone = true) =>
-  s.exercises.reduce((v, se) => v + se.sets.reduce((a, x) =>
+  s.exercises.reduce((v, se) => isTimed(se.exerciseId) ? v : v + se.sets.reduce((a, x) =>
     a + ((!onlyDone || x.done) && !isWarmup(x) ? (parseFloat(x.weight) || 0) * (parseInt(x.reps) || 0) : 0), 0), 0)
 
 export const workingSets = (s: Session, onlyDone = true) =>
   s.exercises.reduce((a, se) => a + se.sets.filter((x) => (!onlyDone || x.done) && !isWarmup(x)).length, 0)
 
 // Free-form numeric input: accepts "," as decimal separator (EU keyboards), one dot, up to 2 decimals.
+// If both "," and "." appear, "," is a thousands separator and is dropped ("1,000.5" -> "1000.5").
 export const sanitizeWeight = (raw: string) => {
-  let v = raw.replace(',', '.').replace(/[^0-9.]/g, '')
+  let v = raw.includes('.') ? raw.replace(/,/g, '') : raw.replace(',', '.')
+  v = v.replace(/[^0-9.]/g, '')
   const i = v.indexOf('.')
-  if (i >= 0) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, '').slice(0, 2)
-  if (v.startsWith('.')) v = '0' + v
-  return v.slice(0, 7)
+  const int = (i >= 0 ? v.slice(0, i) : v).slice(0, 4)
+  if (i < 0) return int
+  return (int || '0') + '.' + v.slice(i + 1).replace(/\./g, '').slice(0, 2)
 }
 export const sanitizeReps = (raw: string) => raw.replace(/\D/g, '').slice(0, 4)
 

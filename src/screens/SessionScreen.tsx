@@ -27,10 +27,7 @@ export function SessionScreen({ onMinimize, onFinished }: { onMinimize: () => vo
   const [finishing, setFinishing] = useState(false)
   const [savingTpl, setSavingTpl] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
-  const [now, setNow] = useState(Date.now())
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null)
-
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
 
   const doneSets = workingSets(active)
   const volume = volumeOf(active)
@@ -45,7 +42,7 @@ export function SessionScreen({ onMinimize, onFinished }: { onMinimize: () => vo
         <motion.button whileTap={{ scale: 0.94 }} className="btn btn-primary btn-sm" onClick={() => { haptic(8); setFinishing(true) }}>Finish</motion.button>
       </div>
       <div className="s-stats">
-        <div className="stat"><div className="stat-v">{fmtDur(now - active.startedAt)}</div><div className="stat-l">Time</div></div>
+        <div className="stat"><div className="stat-v"><Elapsed since={active.startedAt} /></div><div className="stat-l">Time</div></div>
         <div className="stat"><div className="stat-v"><Ticker value={volume} /><span className="muted" style={{ fontSize: 12 }}> kg</span></div><div className="stat-l">Volume</div></div>
         <div className="stat"><div className="stat-v"><Ticker value={doneSets} /></div><div className="stat-l">Sets</div></div>
       </div>
@@ -93,12 +90,13 @@ export function SessionScreen({ onMinimize, onFinished }: { onMinimize: () => vo
       </Sheet>
 
       <FinishSheet open={finishing} onClose={() => setFinishing(false)}
-        duration={now - active.startedAt} sets={doneSets} volume={volume} name={active.name}
+        startedAt={active.startedAt} sets={doneSets} unchecked={active.exercises.reduce((a, e) => a + e.sets.filter((x) => !x.done).length, 0)} volume={volume} name={active.name}
         hasExercises={active.exercises.length > 0} fromTemplate={!!active.templateId}
         onFinish={(tplName) => {
           if (tplName !== null) saveTemplate(tplName)
           const done = finish()
           if (done) onFinished(done, tplName !== null)
+          else toast(tplName !== null ? 'Template saved · nothing logged' : 'Session closed · nothing logged')
         }} />
     </motion.div>
   )
@@ -118,8 +116,15 @@ function TemplateNameSheet({ open, defaultName, onClose, onSave }: { open: boole
   )
 }
 
-function FinishSheet({ open, onClose, duration, sets, volume, name, hasExercises, fromTemplate, onFinish }: {
-  open: boolean; onClose: () => void; duration: number; sets: number; volume: number; name: string; hasExercises: boolean; fromTemplate: boolean; onFinish: (tplName: string | null) => void
+// Isolated so the 1 Hz tick re-renders only this text, not every exercise card.
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
+  return <>{fmtDur(now - since)}</>
+}
+
+function FinishSheet({ open, onClose, startedAt, sets, unchecked, volume, name, hasExercises, fromTemplate, onFinish }: {
+  open: boolean; onClose: () => void; startedAt: number; sets: number; unchecked: number; volume: number; name: string; hasExercises: boolean; fromTemplate: boolean; onFinish: (tplName: string | null) => void
 }) {
   const [asTpl, setAsTpl] = useState(false)
   const [tplName, setTplName] = useState(name)
@@ -129,11 +134,11 @@ function FinishSheet({ open, onClose, duration, sets, volume, name, hasExercises
       <div className="sheet-head"><div className="sheet-title">Finish workout</div></div>
       <div className="sheet-body">
         <div className="summary">
-          <div className="stat"><div className="stat-v">{fmtDur(duration)}</div><div className="stat-l">Time</div></div>
+          <div className="stat"><div className="stat-v"><Elapsed since={startedAt} /></div><div className="stat-l">Time</div></div>
           <div className="stat"><div className="stat-v">{sets}</div><div className="stat-l">Sets</div></div>
           <div className="stat"><div className="stat-v">{Math.round(volume).toLocaleString()}</div><div className="stat-l">kg</div></div>
         </div>
-        {sets === 0 && <p className="muted" style={{ marginTop: 0, fontSize: 14 }}>No sets checked off yet — sets with reps entered will still be saved.</p>}
+        {unchecked > 0 && <p className="muted" style={{ marginTop: 0, fontSize: 14 }}>{unchecked} unchecked set{unchecked === 1 ? '' : 's'} won’t be logged{hasExercises ? ' (templates keep all sets)' : ''}.</p>}
         {hasExercises && (
           <button className="toggle" onClick={() => { haptic(6); setAsTpl((v) => !v) }}>
             <div><div style={{ fontWeight: 700 }}>Save as template</div><div className="muted" style={{ fontSize: 13 }}>{fromTemplate ? 'Save a new copy with today’s numbers' : 'Reuse this workout later'}</div></div>

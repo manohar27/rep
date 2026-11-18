@@ -24,7 +24,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
   const [menu, setMenu] = useState<string | null>(null)
 
   const begin = (fn: () => void) => {
-    if (active) { toast('Finish your current session first'); onStart(); return }
+    if (active) { onStart(); return }
     haptic([8, 30, 12]); fn(); onStart()
   }
 
@@ -35,7 +35,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
         <h1 className="h1">rep<span style={{ color: 'var(--accent)' }}>.</span></h1>
       </motion.div>
 
-      <motion.button variants={item} className="hero" whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} onClick={() => begin(startEmpty)}>
+      <motion.button variants={item} className="hero" whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} onClick={() => (active ? onStart() : begin(startEmpty))}>
         <svg className="hero-bars" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12" /></svg>
         <div className="hero-sub">{active ? 'Session in progress' : 'Quick start'}</div>
         <div className="hero-title">{active ? <>Resume<br />{active.name}</> : <>Start empty<br />session</>}</div>
@@ -63,7 +63,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
                     <>
                       <div style={{ position: 'fixed', inset: 0, zIndex: 4 }} onClick={() => setMenu(null)} />
                       <motion.div className="menu" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: 'spring', stiffness: 600, damping: 32 }}>
-                        <button onClick={() => { setMenu(null); begin(() => startFromTemplate(t.id)) }}><Play width={16} /> Start</button>
+                        <button onClick={() => { setMenu(null); if (active) toast('Finish your current session first'); begin(() => startFromTemplate(t.id)) }}><Play width={16} /> Start</button>
                         <button className="danger" onClick={() => { setMenu(null); haptic(20); deleteTemplate(t.id); toast('Template deleted') }}><Trash /> Delete</button>
                       </motion.div>
                     </>
@@ -106,7 +106,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
                 )
               })}
               <motion.button whileTap={{ scale: 0.97 }} className="btn btn-primary btn-block" style={{ marginTop: 18, height: 54 }}
-                onClick={() => { const id = preview.id; setPreview(null); begin(() => startFromTemplate(id)) }}>
+                onClick={() => { const id = preview.id; setPreview(null); if (active) toast('Finish your current session first'); begin(() => startFromTemplate(id)) }}>
                 <Play width={18} /> Start workout
               </motion.button>
             </div>

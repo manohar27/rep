@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Dots, Play, Plus, Trash } from '../components/Icons'
 import { Sheet } from '../components/Sheet'
 import { toast } from '../components/Toast'
-import { getExercise, haptic, useStore, volumeOf, type Template } from '../lib/store'
+import { getExercise, haptic, useStore, volumeOf, workingSets, type Template } from '../lib/store'
 import { fmtDur } from './SessionScreen'
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.05 } } }
@@ -85,7 +85,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
               <div className="hist-name">{h.name}</div>
               <div className="hist-sub">{ago(h.finishedAt)} · {fmtDur(h.finishedAt - h.startedAt)} · {h.exercises.length} exercise{h.exercises.length === 1 ? "" : "s"}</div>
             </div>
-            <div className="hist-stat"><b>{Math.round(volumeOf(h)).toLocaleString()}</b> kg<br /><b>{h.exercises.reduce((a, e) => a + e.sets.length, 0)}</b> sets</div>
+            <div className="hist-stat"><b>{Math.round(volumeOf(h, false)).toLocaleString()}</b> kg<br /><b>{workingSets(h, false)}</b> sets</div>
           </motion.div>
         ))
       )}

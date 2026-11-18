@@ -2,15 +2,17 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { EXERCISE_BY_ID, type Exercise, type Muscle, type Equipment } from '../data/exercises'
 
-export interface SetEntry { id: string; weight: string; reps: string; done: boolean }
+export type SetType = 'normal' | 'warmup' | 'failure'
+// `type` is optional so sessions persisted before set types existed still load as normal sets.
+export interface SetEntry { id: string; weight: string; reps: string; done: boolean; type?: SetType }
 export interface SessionExercise { id: string; exerciseId: string; sets: SetEntry[] }
 export interface Session { id: string; name: string; startedAt: number; exercises: SessionExercise[]; templateId?: string }
 export interface CompletedSession extends Session { finishedAt: number }
-export interface TemplateExercise { exerciseId: string; sets: { weight: string; reps: string }[] }
+export interface TemplateExercise { exerciseId: string; sets: { weight: string; reps: string; type?: SetType }[] }
 export interface Template { id: string; name: string; exercises: TemplateExercise[]; createdAt: number; lastUsedAt?: number }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
-const newSet = (weight = '', reps = ''): SetEntry => ({ id: uid(), weight, reps, done: false })
+const newSet = (weight = '', reps = '', type: SetType = 'normal'): SetEntry => ({ id: uid(), weight, reps, done: false, type })
 
 interface State {
   active: Session | null
@@ -58,7 +60,7 @@ export const useStore = create<State>()(
             id: uid(), name: t.name, startedAt: Date.now(), templateId: t.id,
             exercises: t.exercises.map((te) => ({
               id: uid(), exerciseId: te.exerciseId,
-              sets: te.sets.length ? te.sets.map((s) => newSet(s.weight, s.reps)) : [newSet()],
+              sets: te.sets.length ? te.sets.map((s) => newSet(s.weight, s.reps, s.type)) : [newSet()],
             })),
           },
           templates: get().templates.map((x) => (x.id === id ? { ...x, lastUsedAt: Date.now() } : x)),
@@ -70,7 +72,7 @@ export const useStore = create<State>()(
         const last = lastSetsFor(st.history)
         const added = ids.map((exerciseId) => {
           const prev = last[exerciseId]
-          return { id: uid(), exerciseId, sets: prev ? prev.map((p) => newSet(p.weight, p.reps)) : [newSet()] }
+          return { id: uid(), exerciseId, sets: prev ? prev.map((p) => newSet(p.weight, p.reps, p.type)) : [newSet()] }
         })
         return { active: { ...st.active, exercises: [...st.active.exercises, ...added] } }
       }),
@@ -115,7 +117,7 @@ export const useStore = create<State>()(
         const t: Template = {
           id: uid(), name: name.trim() || 'Untitled', createdAt: Date.now(),
           exercises: (src?.exercises ?? []).map((se) => ({
-            exerciseId: se.exerciseId, sets: se.sets.map((s) => ({ weight: s.weight, reps: s.reps })),
+            exerciseId: se.exerciseId, sets: se.sets.map((s) => ({ weight: s.weight, reps: s.reps, type: s.type ?? 'normal' })),
           })),
         }
         set((st) => ({ templates: [t, ...st.templates] }))
@@ -150,7 +152,24 @@ export const usePrevious = (exerciseId: string) =>
 export const getExercise = (id: string, custom: Exercise[]): Exercise =>
   EXERCISE_BY_ID[id] ?? custom.find((c) => c.id === id) ?? { id, name: 'Unknown exercise', muscle: 'Full Body', equipment: 'Other', kind: 'weight' }
 
-export const volumeOf = (s: Session) =>
-  s.exercises.reduce((v, se) => v + se.sets.reduce((a, x) => a + (x.done ? (parseFloat(x.weight) || 0) * (parseInt(x.reps) || 0) : 0), 0), 0)
+export const isWarmup = (s: SetEntry) => s.type === 'warmup'
+
+// Warm-ups are logged but excluded from working volume and set counts.
+export const volumeOf = (s: Session, onlyDone = true) =>
+  s.exercises.reduce((v, se) => v + se.sets.reduce((a, x) =>
+    a + ((!onlyDone || x.done) && !isWarmup(x) ? (parseFloat(x.weight) || 0) * (parseInt(x.reps) || 0) : 0), 0), 0)
+
+export const workingSets = (s: Session, onlyDone = true) =>
+  s.exercises.reduce((a, se) => a + se.sets.filter((x) => (!onlyDone || x.done) && !isWarmup(x)).length, 0)
+
+// Free-form numeric input: accepts "," as decimal separator (EU keyboards), one dot, up to 2 decimals.
+export const sanitizeWeight = (raw: string) => {
+  let v = raw.replace(',', '.').replace(/[^0-9.]/g, '')
+  const i = v.indexOf('.')
+  if (i >= 0) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, '').slice(0, 2)
+  if (v.startsWith('.')) v = '0' + v
+  return v.slice(0, 7)
+}
+export const sanitizeReps = (raw: string) => raw.replace(/\D/g, '').slice(0, 4)
 
 export const haptic = (ms: number | number[] = 8) => { try { navigator.vibrate?.(ms) } catch { /* noop */ } }

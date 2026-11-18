@@ -7,7 +7,7 @@ import { RestTimer } from '../components/RestTimer'
 import { Sheet } from '../components/Sheet'
 import { Ticker } from '../components/Ticker'
 import { toast } from '../components/Toast'
-import { haptic, useStore, volumeOf, type CompletedSession } from '../lib/store'
+import { haptic, useStore, volumeOf, workingSets, type CompletedSession } from '../lib/store'
 
 const REST = 90
 
@@ -32,7 +32,7 @@ export function SessionScreen({ onMinimize, onFinished }: { onMinimize: () => vo
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
 
-  const doneSets = active.exercises.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)
+  const doneSets = workingSets(active)
   const volume = volumeOf(active)
   const onSetDone = useCallback(() => setRest({ endsAt: Date.now() + REST * 1000, total: REST }), [])
   const closeRest = useCallback(() => setRest(null), [])
